@@ -43,6 +43,7 @@ class OfferResponse(BaseModel):
     currency: Literal["EUR", "BGN"] = "EUR"
     is_active: bool
     discount_type: Literal["fake", "real"] | None = None
+    confidence_score: float | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -58,7 +59,8 @@ class OfferResponse(BaseModel):
                 "original_price": "1499.99",
                 "currency": "EUR",
                 "is_active": True,
-                "discount_type": "real",
+                "discount_type": "fake",
+                "confidence_score": 0.33,
                 "created_at": "2026-04-25T08:00:00",
                 "updated_at": "2026-04-25T08:00:00",
             }

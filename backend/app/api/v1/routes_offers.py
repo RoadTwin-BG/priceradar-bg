@@ -14,6 +14,23 @@ from app.services.price_analysis import detect_fake_discount
 router = APIRouter(prefix="/offers", tags=["offers"])
 
 
+def build_offer_response(offer: Offer, db: Session) -> OfferResponse:
+    history = (
+        db.query(PriceHistory)
+        .filter(PriceHistory.offer_id == offer.id)
+        .order_by(PriceHistory.recorded_at.desc())
+        .limit(5)
+        .all()
+    )
+    discount_type, confidence_score = detect_fake_discount(offer, history)
+    return OfferResponse.model_validate(offer).model_copy(
+        update={
+            "discount_type": discount_type,
+            "confidence_score": confidence_score,
+        }
+    )
+
+
 @router.post("", response_model=OfferResponse, status_code=status.HTTP_201_CREATED)
 def create_offer(payload: OfferCreate, db: Session = Depends(get_db)) -> Offer:
     offer = Offer(
@@ -42,22 +59,20 @@ def create_offer(payload: OfferCreate, db: Session = Depends(get_db)) -> Offer:
 @router.get("", response_model=list[OfferResponse])
 def list_offers(db: Session = Depends(get_db)) -> list[OfferResponse]:
     offers = db.query(Offer).all()
-    response_items: list[OfferResponse] = []
+    return [build_offer_response(offer, db) for offer in offers]
+
+
+@router.get("/fake", response_model=list[OfferResponse])
+def list_fake_offers(db: Session = Depends(get_db)) -> list[OfferResponse]:
+    offers = db.query(Offer).all()
+    fake_offers: list[OfferResponse] = []
 
     for offer in offers:
-        history = (
-            db.query(PriceHistory)
-            .filter(PriceHistory.offer_id == offer.id)
-            .order_by(PriceHistory.recorded_at.desc())
-            .all()
-        )
-        discount_type = detect_fake_discount(offer, history)
-        offer_response = OfferResponse.model_validate(offer).model_copy(
-            update={"discount_type": discount_type}
-        )
-        response_items.append(offer_response)
+        offer_response = build_offer_response(offer, db)
+        if offer_response.discount_type == "fake":
+            fake_offers.append(offer_response)
 
-    return response_items
+    return fake_offers
 
 
 @router.get("/{offer_id}/history", response_model=list[PriceHistoryResponse])
@@ -77,10 +92,13 @@ def get_offer_history(offer_id: int, db: Session = Depends(get_db)) -> list[Pric
 @router.patch("/{offer_id}/price", response_model=OfferResponse)
 def update_offer_price(
     offer_id: int, payload: OfferPriceUpdate, db: Session = Depends(get_db)
-) -> Offer:
+) -> OfferResponse:
     offer = db.query(Offer).filter(Offer.id == offer_id).first()
     if offer is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found")
+
+    if offer.current_price == payload.current_price:
+        return build_offer_response(offer, db)
 
     offer.current_price = payload.current_price
     offer.updated_at = datetime.utcnow()
@@ -94,4 +112,4 @@ def update_offer_price(
 
     db.commit()
     db.refresh(offer)
-    return offer
+    return build_offer_response(offer, db)
