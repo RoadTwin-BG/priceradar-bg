@@ -42,6 +42,7 @@ class OfferResponse(BaseModel):
     original_price: Decimal | None = Field(default=None, gt=0)
     currency: Literal["EUR", "BGN"] = "EUR"
     is_active: bool
+    discount_type: Literal["fake", "real"] | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -57,6 +58,7 @@ class OfferResponse(BaseModel):
                 "original_price": "1499.99",
                 "currency": "EUR",
                 "is_active": True,
+                "discount_type": "real",
                 "created_at": "2026-04-25T08:00:00",
                 "updated_at": "2026-04-25T08:00:00",
             }

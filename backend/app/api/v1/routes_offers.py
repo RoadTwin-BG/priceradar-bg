@@ -8,6 +8,7 @@ from app.models.offer import Offer
 from app.models.price_history import PriceHistory
 from app.schemas.offer import OfferCreate, OfferPriceUpdate, OfferResponse
 from app.schemas.price_history import PriceHistoryResponse
+from app.services.price_analysis import detect_fake_discount
 
 
 router = APIRouter(prefix="/offers", tags=["offers"])
@@ -39,8 +40,24 @@ def create_offer(payload: OfferCreate, db: Session = Depends(get_db)) -> Offer:
 
 
 @router.get("", response_model=list[OfferResponse])
-def list_offers(db: Session = Depends(get_db)) -> list[Offer]:
-    return db.query(Offer).all()
+def list_offers(db: Session = Depends(get_db)) -> list[OfferResponse]:
+    offers = db.query(Offer).all()
+    response_items: list[OfferResponse] = []
+
+    for offer in offers:
+        history = (
+            db.query(PriceHistory)
+            .filter(PriceHistory.offer_id == offer.id)
+            .order_by(PriceHistory.recorded_at.desc())
+            .all()
+        )
+        discount_type = detect_fake_discount(offer, history)
+        offer_response = OfferResponse.model_validate(offer).model_copy(
+            update={"discount_type": discount_type}
+        )
+        response_items.append(offer_response)
+
+    return response_items
 
 
 @router.get("/{offer_id}/history", response_model=list[PriceHistoryResponse])
