@@ -32,7 +32,7 @@ def build_offer_response(offer: Offer, db: Session) -> OfferResponse:
 
 
 @router.post("", response_model=OfferResponse, status_code=status.HTTP_201_CREATED)
-def create_offer(payload: OfferCreate, db: Session = Depends(get_db)) -> Offer:
+def create_offer(payload: OfferCreate, db: Session = Depends(get_db)) -> OfferResponse:
     offer = Offer(
         product_id=payload.product_id,
         store_id=payload.store_id,
@@ -53,7 +53,7 @@ def create_offer(payload: OfferCreate, db: Session = Depends(get_db)) -> Offer:
 
     db.commit()
     db.refresh(offer)
-    return offer
+    return build_offer_response(offer, db)
 
 
 @router.get("", response_model=list[OfferResponse])
