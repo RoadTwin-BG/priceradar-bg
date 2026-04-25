@@ -1,10 +1,12 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.offer import Offer
 from app.models.price_history import PriceHistory
-from app.schemas.offer import OfferCreate, OfferResponse
+from app.schemas.offer import OfferCreate, OfferPriceUpdate, OfferResponse
 from app.schemas.price_history import PriceHistoryResponse
 
 
@@ -53,3 +55,26 @@ def get_offer_history(offer_id: int, db: Session = Depends(get_db)) -> list[Pric
         .order_by(PriceHistory.recorded_at.desc())
         .all()
     )
+
+
+@router.patch("/{offer_id}/price", response_model=OfferResponse)
+def update_offer_price(
+    offer_id: int, payload: OfferPriceUpdate, db: Session = Depends(get_db)
+) -> Offer:
+    offer = db.query(Offer).filter(Offer.id == offer_id).first()
+    if offer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found")
+
+    offer.current_price = payload.current_price
+    offer.updated_at = datetime.utcnow()
+
+    db.add(
+        PriceHistory(
+            offer_id=offer.id,
+            price=payload.current_price,
+        )
+    )
+
+    db.commit()
+    db.refresh(offer)
+    return offer

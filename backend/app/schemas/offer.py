@@ -29,6 +29,10 @@ class OfferCreate(BaseModel):
     )
 
 
+class OfferPriceUpdate(BaseModel):
+    current_price: Decimal = Field(gt=0)
+
+
 class OfferResponse(BaseModel):
     id: int
     product_id: int
